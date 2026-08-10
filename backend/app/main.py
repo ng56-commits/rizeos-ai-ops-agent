@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.mock_data import get_payments, get_verifications, get_applications
 from app.monitor_agent import run_monitor
+from app.diagnostic_agent import diagnose_finding
 
 app = FastAPI(title="RizeOS AI Ops Agent", version="0.1.0")
 
@@ -47,6 +48,23 @@ def applications():
 def findings():
     """
     Everything the Monitor Agent has flagged as worth looking into.
-    This is what the Diagnostic Agent (Day 2) will consume next.
+    This is what the Diagnostic Agent consumes next.
     """
     return run_monitor()
+
+
+@app.get("/cases")
+def cases():
+    """
+    The full pipeline: Monitor -> Diagnose -> Route, for every current
+    Finding. This is what the dashboard will actually call.
+    """
+    all_findings = run_monitor()
+    results = []
+    for f in all_findings:
+        diagnosis_result = diagnose_finding(f.model_dump(mode="json"))
+        results.append({
+            "finding": f.model_dump(mode="json"),
+            **diagnosis_result,
+        })
+    return results
