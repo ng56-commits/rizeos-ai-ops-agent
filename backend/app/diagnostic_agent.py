@@ -131,3 +131,44 @@ def diagnose_finding(finding: dict) -> dict:
         "decision": result["decision"],
         "error": result["error"],
     }
+
+
+ASK_SYSTEM_PROMPT = """You are the same diagnostic agent, now answering a follow-up
+question from a human ops team member about a case you already diagnosed.
+
+Rules:
+- Only use information present in the finding data and your original diagnosis.
+- If the question asks something the data can't answer, say so honestly instead
+  of guessing.
+- Keep answers short (2-4 sentences) and plain — this is being read by a person
+  working through a queue of cases, not written for a report.
+"""
+
+
+def ask_about_case(finding: dict, diagnosis: dict, question: str) -> dict:
+    """
+    A second, grounded Groq call for a human asking a follow-up question about
+    a specific case. Same error-handling pattern as diagnose_finding — a failed
+    call returns a safe message instead of crashing.
+    """
+    user_prompt = (
+        f"Finding: {json.dumps(finding)}\n"
+        f"Original diagnosis: {json.dumps(diagnosis)}\n\n"
+        f"Question: {question}"
+    )
+    try:
+        response = client.chat.completions.create(
+            model=GROQ_MODEL,
+            messages=[
+                {"role": "system", "content": ASK_SYSTEM_PROMPT},
+                {"role": "user", "content": user_prompt},
+            ],
+            temperature=0.3,
+            timeout=10,
+        )
+        return {"answer": response.choices[0].message.content, "error": None}
+    except Exception as e:
+        return {
+            "answer": "Couldn't reach the agent right now — the model call failed or timed out. Try again in a moment.",
+            "error": str(e),
+        }

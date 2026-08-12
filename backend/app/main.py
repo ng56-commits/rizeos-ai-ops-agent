@@ -8,10 +8,13 @@ LangGraph) that takes these findings and reasons about them.
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from typing import Literal, Optional
 
 from app.mock_data import get_payments, get_verifications, get_applications
 from app.monitor_agent import run_monitor
-from app.diagnostic_agent import diagnose_finding
+from app.diagnostic_agent import diagnose_finding, ask_about_case
+from app.feedback_logger import log_override, get_log, get_pattern_summary
 
 app = FastAPI(title="RizeOS AI Ops Agent", version="0.1.0")
 
@@ -57,7 +60,8 @@ def findings():
 def cases():
     """
     The full pipeline: Monitor -> Diagnose -> Route, for every current
-    Finding. This is what the dashboard will actually call.
+    Finding. This is what the dashboard calls, including on manual
+    "re-scan" — every call genuinely re-runs the live pipeline.
     """
     all_findings = run_monitor()
     results = []
@@ -68,3 +72,45 @@ def cases():
             **diagnosis_result,
         })
     return results
+
+
+class OverrideRequest(BaseModel):
+    finding_id: str
+    finding_type: str
+    action: Literal["resolved", "escalated"]
+    note: Optional[str] = ""
+
+
+@app.post("/cases/override")
+def override_case(body: OverrideRequest):
+    """
+    A human manually marks a case resolved or escalated, overriding (or
+    confirming) what the agent decided. This is the real Feedback Logger
+    from the architecture diagram — it's what the Playbook page reads from.
+    """
+    log_override(body.finding_id, body.finding_type, body.action, body.note)
+    return {"status": "logged"}
+
+
+class AskRequest(BaseModel):
+    finding: dict
+    diagnosis: dict
+    question: str
+
+
+@app.post("/cases/ask")
+def ask_case(body: AskRequest):
+    """A human asks a follow-up question about a specific case's diagnosis."""
+    return ask_about_case(body.finding, body.diagnosis, body.question)
+
+
+@app.get("/playbook")
+def playbook():
+    """
+    Real accumulated history of human overrides, grouped into patterns.
+    Grows as the ops team actually uses the system — not hardcoded.
+    """
+    return {
+        "log": get_log(),
+        "patterns": get_pattern_summary(),
+    }
