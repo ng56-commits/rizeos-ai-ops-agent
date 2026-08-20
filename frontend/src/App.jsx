@@ -10,7 +10,7 @@ import {
   ResponsiveContainer, BarChart, Bar, Legend
 } from "recharts";
 
-const API_BASE = "http://127.0.0.1:8000";
+const API_BASE = "https://rizeos-ai-ops-agent-backend.onrender.com";
 
 function normalizeCase(raw) {
   const f = raw.finding;
