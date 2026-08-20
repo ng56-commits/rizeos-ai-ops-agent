@@ -32,7 +32,7 @@ load_dotenv()  # reads GROQ_API_KEY from backend/.env into the environment
 logger = logging.getLogger("diagnostic_agent")
 logging.basicConfig(level=logging.INFO)
 
-GROQ_MODEL = "llama-3.1-8b-instant"
+GROQ_MODEL = "openai/gpt-oss-20b"
 CONFIDENCE_THRESHOLD = 70
 REQUEST_TIMEOUT_SECONDS = 10
 MAX_RETRIES = 2  # total attempts = 1 + MAX_RETRIES
